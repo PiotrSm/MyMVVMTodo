@@ -1,7 +1,6 @@
 package com.homeworkshop.mymvvmtodo.data
 
 import androidx.room.*
-import com.homeworkshop.mymvvmtodo.ui.tasks.SortOrder
 import kotlinx.coroutines.flow.Flow
 
 
