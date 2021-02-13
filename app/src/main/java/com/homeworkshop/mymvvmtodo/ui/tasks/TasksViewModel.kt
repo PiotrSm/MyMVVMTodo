@@ -6,10 +6,13 @@ import androidx.lifecycle.asLiveData
 import androidx.lifecycle.viewModelScope
 import com.homeworkshop.mymvvmtodo.data.PreferencesManager
 import com.homeworkshop.mymvvmtodo.data.SortOrder
+import com.homeworkshop.mymvvmtodo.data.Task
 import com.homeworkshop.mymvvmtodo.data.TaskDao
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.launch
 
 class TasksViewModel @ViewModelInject constructor(
@@ -43,6 +46,11 @@ class TasksViewModel @ViewModelInject constructor(
 
     val preferencesFlow = preferencesManager.preferencesFlow
 
+    //Kanał który reprezentuje te TaskEvent
+    private val taskEventChannel = Channel<TasksEvent>()
+    val taskEvent =
+        taskEventChannel.receiveAsFlow() // zamienia nasz Kanał w Flow z którego możemy potem wybierać dane
+
     //Użycie preferencesFlow zamiast dwóch lokalnych zmiennych do ustawień
     private val tasksFlow = combine(
         searchQuery,
@@ -62,8 +70,26 @@ class TasksViewModel @ViewModelInject constructor(
         preferencesManager.updateHideCompleted(hideCompleted)
     }
 
+    fun onTaskSwiped(task: Task) = viewModelScope.launch {
+        taskDao.delete(task)
+        //wkładamy event do tego kanału aby został przechwycony przez fragment
+        taskEventChannel.send(TasksEvent.ShowUndoDeleteTaskMessage(task))
+    }
+
+    //metoda wywoływana z fragmentu dla cofnięcia usuniecia taska
+    fun onUndoDeleteClick(task: Task) = viewModelScope.launch {
+        taskDao.insert(task)
+    }
+
     val tasks = tasksFlow.asLiveData()
 
     // stosujemy Flow pod LiveData bo Flow jest bardziej flexible i dostarcza wielu potrzebnych metod
 //    val tasks = taskDao.getTasks("bla").asLiveData() // pobieranie listy taskow które będą przechowywane w ViewModelu
+
+    /**
+     * klasaa która reprezentuje różne rodzaje eventów które chcemy wysyłać do fragmentu
+     */
+    sealed class TasksEvent {
+        data class ShowUndoDeleteTaskMessage(val task: Task) : TasksEvent()
+    }
 }
